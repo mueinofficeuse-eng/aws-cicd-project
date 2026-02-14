@@ -1,86 +1,120 @@
-# Jenkins CI/CD on Amazon Linux 2023
+# 🚀 Full Stack CI/CD Pipeline on Amazon Linux 2023
 
-This project provides a complete setup and pipeline for Jenkins running on AWS Amazon Linux 2023.
+This project demonstrates a professional CI/CD pipeline built on **Amazon Linux 2023** using Jenkins, Docker, and GitHub. It automates the building, testing, and deployment of a modern Node.js application.
 
-## 🚀 Setup Instructions for EC2
+---
 
-Connect to your Amazon Linux 2023 instance and run the following commands to install Jenkins and Docker.
+## � Phase 1: Infrastructure Setup (EC2)
 
-### 1. Install Java 21 (Recommended LTS)
+Connect to your Amazon Linux 2023 instance and run the following commands.
+
+### 1. Install Java 21, Git & Docker (Base Requirements)
 ```bash
+# Update system and install Git
 sudo dnf update -y
+sudo dnf install git -y
+
+# Install Java 21 (Latest LTS for Jenkins)
 sudo dnf install java-21-amazon-corretto -y
+
+# Install Docker
+sudo dnf install docker -y
+sudo systemctl enable docker
+sudo systemctl start docker
 ```
 
 ### 2. Install Jenkins
 ```bash
-sudo wget -O /etc/yum.repos.d/jenkins.repo \
-    https://pkg.jenkins.io/redhat-stable/jenkins.repo
+# Register Jenkins Repository
+sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
 sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
-sudo dnf upgrade
+
+# Install and Start Jenkins
+sudo dnf upgrade -y
 sudo dnf install jenkins -y
 sudo systemctl enable jenkins
 sudo systemctl start jenkins
 ```
 
-### 3. Install Docker
+### 3. Permissions & Groups (Crucial Integration)
+Jenkins needs permission to talk to Docker. Run these commands:
 ```bash
-sudo dnf install docker -y
-sudo systemctl enable docker
-sudo systemctl start docker
 sudo usermod -aG docker jenkins
 sudo usermod -aG docker ec2-user
+# Restart Jenkins to apply group changes
+sudo systemctl restart jenkins
 ```
 
-### 4. Setup Post-Installation & CI/CD Pipeline
+---
 
-Once the software is installed, follow these detailed steps to get your first pipeline running:
+## ⚙️ Phase 2: Jenkins Global Configuration
 
-#### Step A: Unlock Jenkins
-1. Access Jenkins via your browser: `http://YOUR_EC2_IP:8080` (Ensure port 8080 is open in your AWS Security Group).
-2. Get the password from your terminal:
-   ```bash
-   sudo cat /var/lib/jenkins/secrets/initialAdminPassword
-   ```
-3. Paste the password and click **Continue**.
+Before running your first build, you must unblock the Jenkins engine.
 
-#### Step B: Install Plugins
-1. Click **"Install suggested plugins"** and wait for the process to finish.
-2. After creating your Admin User, go to **Manage Jenkins** > **Plugins** > **Available Plugins**.
-3. Search for and install the following (Select "Install without restart"):
-   - `Docker`
-   - `Docker Pipeline`
-   - `NodeJS` (Optional, as we use Docker for builds, but good to have).
+### 1. Enable Executors (Fix "Still waiting to schedule task")
+1. Go to **Manage Jenkins** > **Nodes**.
+2. Click **Configure** (Gear icon) on **Built-in Node**.
+3. Set **Number of executors** to `2`.
+4. Set **Usage** to `Use this node as much as possible`.
 
-#### Step C: Configure AWS Security Groups
-Make sure your EC2 Security Group has these ports open:
-- `8080`: Jenkins Web UI
-- `3000`: Your running Application (deployed by the pipeline)
-- `22`: SSH access
+### 2. Bypass Disk Space Thresholds (AL2023 /tmp fix)
+If the node is offline due to "Disk space below 1GiB":
+1. Go to **Manage Jenkins** > **Nodes** > **Configure Monitors**.
+2. Set **Free Disk Space Threshold** to `100MiB`.
+3. Set **Free Temp Space Threshold** to `100MiB`.
+4. Return to **Nodes** > click **Built-in Node** > **Bring this node online**.
 
-#### Step D: Create your First Pipeline Job
-1. On the Jenkins Dashboard, click **New Item**.
-2. Name it `premium-cicd-app`, select **Pipeline**, and click **OK**.
-3. Scroll down to the **Pipeline** section.
-4. Set **Definition** to `Pipeline script from SCM`.
-5. Set **SCM** to `Git`.
-6. Enter your **Repository URL** (e.g., `https://github.com/your-username/your-repo.git`).
-7. Ensure the **Branch Specifier** matches your branch (usually `*/main`).
-8. Ensure **Script Path** is set to `Jenkinsfile`.
-9. Click **Save**.
+---
 
-#### Step E: Run the Pipeline
-1. Click **Build Now** on the left menu.
-2. Watch the **Stage View** as Jenkins:
-   - Pulls your code.
-   - Builds the Docker Image.
-   - Runs tests.
-   - Deploys the App.
-3. Once successful (green), visit: `http://YOUR_EC2_IP:3000` to see your running app!
+## 🔗 Phase 3: Project Integration (GitHub & Pipeline)
 
-## 🛠 Project Structure
-- `app.js`: Simple Node.js application.
-- `package.json`: Project dependencies.
-- `Jenkinsfile`: CI/CD pipeline definition (The brain of your automation).
-- `Dockerfile`: Containerization instructions.
-- `setup.sh`: Automated installer for AL2023.
+### 1. AWS Security Groups
+Ensure your EC2 Security Group allows:
+- `8080`: Jenkins UI
+- `3000`: Live Application
+- `22`: SSH Access
+
+### 2. Create the Pipeline Job
+1. **New Item** > **Pipeline** > Name it `AL2023-CICD`.
+2. **Build Triggers**: Check `GitHub hook trigger for GITScm polling`.
+3. **Pipeline Section**:
+   - **Definition**: Pipeline script from SCM
+   - **SCM**: Git
+   - **Repository URL**: `https://github.com/your-username/your-repo.git`
+   - **Branch**: `*/main`
+   - **Script Path**: `Jenkinsfile`
+
+### 3. Setup Automation (Webhook)
+- **GitHub** > **Settings** > **Webhooks** > **Add webhook**.
+- **Payload URL**: `http://YOUR_EC2_IP:8080/github-webhook/`
+- **Content type**: `application/json`.
+*Note: If you get a 403 error, verify your Jenkins security settings or use **Poll SCM** instead.*
+
+---
+
+## 🧪 Pipeline logic (Jenkinsfile)
+
+The pipeline is defined in a `Jenkinsfile` in the root of the repo. It handles:
+- **Build**: Creates a Docker image named `cicd-app-al2023`.
+- **Test**: Runs `npm test` **inside** the Docker container (No need to install Node.js on EC2).
+- **Deploy**: Automatically replaces the old container with the new version on **Port 3000**.
+
+---
+
+## 🆘 Troubleshooting Common Issues
+
+| Error | Cause | Solution |
+| :--- | :--- | :--- |
+| `npm not found` | Running test on host | Use `docker run <image> npm test` in Jenkinsfile |
+| `Permission Denied (Docker)` | Jenkins user rights | `sudo usermod -aG docker jenkins && restart jenkins` |
+| `403 Webhook Forbidden` | CSRF Security | Enable 'Proxy Compatibility' in Jenkins Security |
+| `Still waiting to schedule` | 0 Executors | Set executors to 2 in Node configurations |
+
+---
+
+## � Project Structure
+- `app.js`: premium Node.js application code.
+- `Jenkinsfile`: Automation pipeline script.
+- `Dockerfile`: Container configuration.
+- `setup.sh`: One-click software installer.
+- `package.json`: Dependencies & metadata.
