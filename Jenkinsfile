@@ -26,8 +26,8 @@ pipeline {
 
         stage('Test') {
             steps {
-                echo 'Running tests...'
-                sh "npm install && npm test"
+                echo 'Running tests inside the Docker container...'
+                sh "docker run --rm ${DOCKER_IMAGE}:latest npm test"
             }
         }
 
