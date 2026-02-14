@@ -4,9 +4,10 @@
 echo "Updating system..."
 sudo dnf update -y
 
-# Install Java 21 (Latest LTS, Recommended for Jenkins in 2026)
-echo "Installing Java 21..."
-sudo dnf install java-21-amazon-corretto -y
+# Install Java 21 & Git (Latest LTS, Recommended for Jenkins in 2026)
+echo "Installing Java 21 & Git..."
+sudo dnf install java-21-amazon-corretto git -y
+
 # Add Jenkins Repository
 echo "Configuring Jenkins Repo..."
 sudo wget -O /etc/yum.repos.d/jenkins.repo \
