@@ -68,7 +68,7 @@ app.get('/', (req, res) => {
         <body>
             <div class="container">
                 <div class="badge">Amazon Linux 2023 Optimized</div>
-                <h1>CI/CD is Live!</h1>
+                <h1>CI/CD is Live! Test 1</h1>
                 <p>Built with Jenkins, Docker, and AWS</p>
             </div>
         </body>
